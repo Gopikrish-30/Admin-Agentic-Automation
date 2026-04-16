@@ -15,8 +15,7 @@ import {
   FormError,
   ModelSelector,
 } from '../shared';
-
-import ollamaLogo from '/assets/ai-logos/ollama.svg';
+import { PROVIDER_LOGOS } from '@/lib/provider-logos';
 
 interface OllamaModel {
   id: string;
@@ -242,7 +241,11 @@ export function OllamaProviderForm({
       className="rounded-xl border border-border bg-card p-5"
       data-testid="provider-settings-panel"
     >
-      <ProviderFormHeader logoSrc={ollamaLogo} providerName={t('providers.ollama')} invertInDark />
+      <ProviderFormHeader
+        logoSrc={PROVIDER_LOGOS.openai}
+        providerName={t('providers.ollama')}
+        invertInDark
+      />
 
       <div className="space-y-3">
         <AnimatePresence mode="wait">

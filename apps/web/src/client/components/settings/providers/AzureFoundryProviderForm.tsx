@@ -11,9 +11,7 @@ import {
   ProviderFormHeader,
   FormError,
 } from '../shared';
-
-// Import Azure logo
-import azureLogo from '/assets/ai-logos/azure.svg';
+import { PROVIDER_LOGOS } from '@/lib/provider-logos';
 
 interface AzureFoundryProviderFormProps {
   connectedProvider?: ConnectedProvider;
@@ -116,7 +114,7 @@ export function AzureFoundryProviderForm({
       className="rounded-xl border border-border bg-card p-5"
       data-testid="provider-settings-panel"
     >
-      <ProviderFormHeader logoSrc={azureLogo} providerName="Azure AI Foundry" />
+      <ProviderFormHeader logoSrc={PROVIDER_LOGOS.openai} providerName="Azure AI Foundry" />
 
       <div className="space-y-3">
         {!isConnected ? (

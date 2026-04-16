@@ -4,7 +4,6 @@ import {
   BrowserWindow,
   shell,
   ipcMain,
-  nativeImage,
   dialog,
   nativeTheme,
   Menu,
@@ -111,15 +110,6 @@ function getPreloadPath(): string {
 function createWindow() {
   console.log('[Main] Creating main application window');
 
-  const iconFile = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-  const iconPath = app.isPackaged
-    ? path.join(process.resourcesPath, iconFile)
-    : path.join(process.env.APP_ROOT!, 'resources', iconFile);
-  const icon = nativeImage.createFromPath(iconPath);
-  if (process.platform === 'darwin' && app.dock && !icon.isEmpty()) {
-    app.dock.setIcon(icon);
-  }
-
   const preloadPath = getPreloadPath();
   console.log('[Main] Using preload script:', preloadPath);
 
@@ -129,7 +119,6 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Admin',
-    icon: icon.isEmpty() ? undefined : icon,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#171717' : '#f9f9f9',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     trafficLightPosition: { x: 16, y: 16 },
@@ -322,16 +311,6 @@ if (!gotTheLock) {
     }
 
     await skillsManager.initialize();
-
-    if (process.platform === 'darwin' && app.dock) {
-      const iconPath = app.isPackaged
-        ? path.join(process.resourcesPath, 'icon.png')
-        : path.join(process.env.APP_ROOT!, 'resources', 'icon.png');
-      const icon = nativeImage.createFromPath(iconPath);
-      if (!icon.isEmpty()) {
-        app.dock.setIcon(icon);
-      }
-    }
 
     // Must run before createWindow() so backgroundColor matches the theme
     try {

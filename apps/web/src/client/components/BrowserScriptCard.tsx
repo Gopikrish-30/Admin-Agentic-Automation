@@ -14,11 +14,19 @@ import {
 } from '@phosphor-icons/react';
 import { cn } from '@/lib/utils';
 import { springs } from '../lib/animations';
-import loadingSymbol from '/assets/loading-symbol.svg';
 
 // Spinning Admin icon component
 const SpinningIcon = ({ className }: { className?: string }) => (
-  <img src={loadingSymbol} alt="" className={cn('animate-spin-ccw', className)} />
+  <svg className={cn('animate-spin', className)} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" className="opacity-25" />
+    <path
+      d="M22 12a10 10 0 00-10-10"
+      stroke="currentColor"
+      strokeWidth="3"
+      strokeLinecap="round"
+      className="opacity-90"
+    />
+  </svg>
 );
 
 // Browser action type from the MCP tool

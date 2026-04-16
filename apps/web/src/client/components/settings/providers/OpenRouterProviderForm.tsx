@@ -14,9 +14,7 @@ import {
   FormError,
 } from '../shared';
 import { settingsVariants, settingsTransitions } from '@/lib/animations';
-
-// Import OpenRouter logo
-import openrouterLogo from '/assets/ai-logos/openrouter.svg';
+import { PROVIDER_LOGOS } from '@/lib/provider-logos';
 
 interface OpenRouterProviderFormProps {
   connectedProvider?: ConnectedProvider;
@@ -114,7 +112,7 @@ export function OpenRouterProviderForm({
       data-testid="provider-settings-panel"
     >
       <ProviderFormHeader
-        logoSrc={openrouterLogo}
+        logoSrc={PROVIDER_LOGOS.openai}
         providerName={t('providers.openrouter')}
         invertInDark
       />

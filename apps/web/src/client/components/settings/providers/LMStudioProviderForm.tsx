@@ -15,8 +15,7 @@ import {
   FormError,
   ModelSelector,
 } from '../shared';
-
-import lmstudioLogo from '/assets/ai-logos/lmstudio.png';
+import { PROVIDER_LOGOS } from '@/lib/provider-logos';
 
 interface LMStudioModel {
   id: string;
@@ -246,7 +245,7 @@ export function LMStudioProviderForm({
       className="rounded-xl border border-border bg-card p-5"
       data-testid="provider-settings-panel"
     >
-      <ProviderFormHeader logoSrc={lmstudioLogo} providerName="LM Studio" />
+      <ProviderFormHeader logoSrc={PROVIDER_LOGOS.openai} providerName="LM Studio" />
 
       <div className="space-y-3">
         <AnimatePresence mode="wait">

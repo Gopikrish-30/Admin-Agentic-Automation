@@ -19,9 +19,7 @@ import {
   FormError,
 } from '../shared';
 import { BedrockApiKeyTab } from './BedrockApiKeyTab';
-
-// Import Bedrock logo
-import bedrockLogo from '/assets/ai-logos/bedrock.svg';
+import { PROVIDER_LOGOS } from '@/lib/provider-logos';
 
 interface BedrockProviderFormProps {
   connectedProvider?: ConnectedProvider;
@@ -137,7 +135,7 @@ export function BedrockProviderForm({
       className="rounded-xl border border-border bg-card p-5"
       data-testid="provider-settings-panel"
     >
-      <ProviderFormHeader logoSrc={bedrockLogo} providerName={t('providers.bedrock')} />
+      <ProviderFormHeader logoSrc={PROVIDER_LOGOS.openai} providerName={t('providers.bedrock')} />
 
       <div className="space-y-3">
         <AnimatePresence mode="wait">

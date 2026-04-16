@@ -93,10 +93,6 @@
     ],
     "extraResources": [
       {
-        "from": "resources/icon.png",
-        "to": "icon.png"
-      },
-      {
         "from": "../../packages/agent-core/mcp-tools",
         "to": "mcp-tools",
         "filter": [
@@ -156,7 +152,6 @@
       "gatekeeperAssess": false,
       "entitlements": "resources/entitlements.mac.plist",
       "entitlementsInherit": "resources/entitlements.mac.plist",
-      "icon": "resources/icon.png",
       "target": [
         "dmg",
         "zip"
@@ -179,8 +174,7 @@
     "win": {
       "target": [
         "nsis"
-      ],
-      "icon": "resources/icon.ico"
+      ]
     },
     "nsis": {
       "oneClick": true,
@@ -190,8 +184,6 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Admin",
       "runAfterFinish": true,
-      "installerIcon": "resources/icon.ico",
-      "uninstallerIcon": "resources/icon.ico",
       "deleteAppDataOnUninstall": false
     }
   }

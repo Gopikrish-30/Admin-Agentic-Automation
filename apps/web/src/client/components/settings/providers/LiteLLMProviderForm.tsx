@@ -13,9 +13,7 @@ import {
 } from '../shared';
 import { settingsVariants, settingsTransitions } from '@/lib/animations';
 import { getAdminApp } from '@/lib/navigator-app';
-
-// Import LiteLLM logo
-import litellmLogo from '/assets/ai-logos/litellm.svg';
+import { PROVIDER_LOGOS } from '@/lib/provider-logos';
 
 interface LiteLLMProviderFormProps {
   connectedProvider?: ConnectedProvider;
@@ -101,7 +99,7 @@ export function LiteLLMProviderForm({
       className="rounded-xl border border-border bg-card p-5"
       data-testid="provider-settings-panel"
     >
-      <ProviderFormHeader logoSrc={litellmLogo} providerName={t('providers.litellm')} />
+      <ProviderFormHeader logoSrc={PROVIDER_LOGOS.openai} providerName={t('providers.litellm')} />
 
       <div className="space-y-3">
         <AnimatePresence mode="wait">

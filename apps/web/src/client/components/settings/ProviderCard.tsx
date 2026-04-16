@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { settingsVariants, settingsTransitions } from '@/lib/animations';
 import { PROVIDER_LOGOS, DARK_INVERT_PROVIDERS } from '@/lib/provider-logos';
 import { cn } from '@/lib/utils';
-import connectedKeyIcon from '/assets/icons/connected-key.svg';
 
 interface ProviderCardProps {
   providerId: ProviderId;
@@ -64,12 +63,13 @@ export const ProviderCard = memo(function ProviderCard({
             exit="exit"
             transition={settingsTransitions.enter}
           >
-            <img
-              src={connectedKeyIcon}
-              alt={providerReady ? t('status.ready') : t('status.connected')}
-              className="h-5 w-5"
+            <span
+              className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-provider-accent text-[11px] font-bold text-white"
               title={providerReady ? undefined : t('status.selectModelToComplete')}
-            />
+              aria-label={providerReady ? t('status.ready') : t('status.connected')}
+            >
+              ✓
+            </span>
           </motion.div>
         )}
       </AnimatePresence>

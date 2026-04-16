@@ -14,8 +14,7 @@ import {
   ProviderFormHeader,
   FormError,
 } from '../shared';
-
-import zaiLogo from '/assets/ai-logos/zai.svg';
+import { PROVIDER_LOGOS } from '@/lib/provider-logos';
 
 interface ZaiProviderFormProps {
   connectedProvider?: ConnectedProvider;
@@ -143,7 +142,7 @@ export function ZaiProviderForm({
       className="rounded-xl border border-border bg-card p-5"
       data-testid="provider-settings-panel"
     >
-      <ProviderFormHeader logoSrc={zaiLogo} providerName={meta.name} />
+      <ProviderFormHeader logoSrc={PROVIDER_LOGOS.openai} providerName={meta.name} />
 
       <div className="space-y-3">
         <AnimatePresence mode="wait">
