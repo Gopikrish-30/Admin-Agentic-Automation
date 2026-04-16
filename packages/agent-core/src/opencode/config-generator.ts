@@ -1,0 +1,602 @@
+import path from 'path';
+import fs from 'fs';
+import type { ProviderId } from '../common/types/providerSettings.js';
+import type { Skill } from '../common/types/skills.js';
+
+export const NAVIGATOR_AGENT_NAME = 'navigator';
+
+export interface BrowserConfig {
+  /** 'builtin' = dev-browser HTTP server (default), 'remote' = connect to CDP endpoint, 'none' = no browser */
+  mode: 'builtin' | 'remote' | 'none';
+  /** For 'remote': the CDP endpoint URL */
+  cdpEndpoint?: string;
+  /** For 'remote': auth headers (e.g. { 'X-CDP-Secret': '...' }) */
+  cdpHeaders?: Record<string, string>;
+  /** For 'builtin': run headless */
+  headless?: boolean;
+}
+
+export interface ConfigGeneratorOptions {
+  platform: NodeJS.Platform;
+  mcpToolsPath: string;
+  provider?: {
+    id: ProviderId;
+    model: string;
+    baseUrl?: string;
+  };
+  apiKey?: string;
+  skills?: Skill[];
+  bundledNodeBinPath?: string;
+  isPackaged: boolean;
+  providerConfigs?: ProviderConfig[];
+  azureFoundryToken?: string;
+  permissionApiPort?: number;
+  questionApiPort?: number;
+  localApiAuthToken?: string;
+  userDataPath: string;
+  model?: string;
+  smallModel?: string;
+  enabledProviders?: string[];
+  /** Browser configuration. Defaults to { mode: 'builtin' } */
+  browser?: BrowserConfig;
+  /** Connected MCP remote servers with OAuth access tokens */
+  connectors?: Array<{
+    id: string;
+    name: string;
+    url: string;
+    accessToken: string;
+  }>;
+  /** Restricts automation behavior. Default: general */
+  automationScope?: 'general' | 'mock-admin-only';
+  /** Base URL for mock admin panel when automationScope is mock-admin-only */
+  mockAdminBaseUrl?: string;
+}
+
+export interface ProviderConfig {
+  id: string;
+  npm?: string;
+  name?: string;
+  options: Record<string, unknown>;
+  models?: Record<string, ProviderModelConfig>;
+}
+
+export interface ProviderModelConfig {
+  name: string;
+  tools?: boolean;
+  limit?: {
+    context?: number;
+    output?: number;
+  };
+  options?: Record<string, unknown>;
+}
+
+export interface GeneratedConfig {
+  systemPrompt: string;
+  mcpServers: Record<string, McpServerConfig>;
+  environment: Record<string, string>;
+  config: OpenCodeConfigFile;
+  configPath: string;
+}
+
+interface McpServerConfig {
+  type?: 'local' | 'remote';
+  command?: string[];
+  url?: string;
+  headers?: Record<string, string>;
+  enabled?: boolean;
+  environment?: Record<string, string>;
+  timeout?: number;
+}
+
+interface AgentConfig {
+  description?: string;
+  prompt?: string;
+  mode?: 'primary' | 'subagent' | 'all';
+}
+
+interface OpenCodeConfigFile {
+  $schema?: string;
+  model?: string;
+  small_model?: string;
+  default_agent?: string;
+  enabled_providers?: string[];
+  permission?: string | Record<string, string | Record<string, string>>;
+  agent?: Record<string, AgentConfig>;
+  mcp?: Record<string, McpServerConfig>;
+  provider?: Record<string, Omit<ProviderConfig, 'id'>>;
+  plugin?: string[];
+  experimental?: Record<string, unknown>;
+}
+
+function getPlatformEnvironmentInstructions(platform: NodeJS.Platform): string {
+  if (platform === 'win32') {
+    return `<environment>
+**You are running on Windows.** Use Windows-compatible commands:
+- Use PowerShell syntax, not bash/Unix syntax
+- Use \`$env:TEMP\` for temp directory (not /tmp)
+- Use semicolon (;) for PATH separator (not colon)
+- Use \`$env:VAR\` for environment variables (not $VAR)
+</environment>`;
+  } else {
+    return `<environment>
+You are running on ${platform === 'darwin' ? 'macOS' : 'Linux'}.
+</environment>`;
+  }
+}
+
+const NAVIGATOR_SYSTEM_PROMPT_TEMPLATE = `<identity>
+You are Admin, a {{AGENT_ROLE}} assistant.
+</identity>
+
+{{ENVIRONMENT_INSTRUCTIONS}}
+
+<behavior name="task-planning">
+##############################################################################
+# CRITICAL: CALL start_task FIRST - THIS IS MANDATORY
+##############################################################################
+
+You MUST call start_task before any other tool. This is enforced - other tools will fail until start_task is called.
+
+**Decide: Does this request need planning?**
+
+Set \`needs_planning: true\` if completing the request will require tools beyond start_task and complete_task (e.g., file operations, browser actions, bash commands).
+Set \`needs_planning: false\` if you can answer from knowledge alone using only start_task → text response → stop. This includes greetings, knowledge questions, meta-questions about your capabilities, help requests, and conversational messages.
+
+**When needs_planning is TRUE** — provide goal, steps, verification:
+
+start_task requires:
+- original_request: Echo the user's request exactly as stated
+- goal: What you aim to accomplish
+- steps: Array of planned actions to achieve the goal
+- verification: Array of how you will verify the task is complete
+- skills: Array of relevant skill names from <available-skills> (or empty [] if none apply)
+
+**STEP 2: UPDATE TODOS AS YOU PROGRESS**
+
+As you complete each step, call \`todowrite\` to update progress:
+- Mark completed steps as "completed"
+- Mark the current step as "in_progress"
+- Keep the same step content - do NOT change the text
+
+**STEP 3: COMPLETE ALL TODOS BEFORE FINISHING**
+
+All todos must be "completed" or "cancelled" before calling complete_task.
+
+WRONG: Starting work without calling start_task first
+WRONG: Forgetting to update todos as you progress
+CORRECT: Call start_task FIRST, update todos as you work, then complete_task
+
+**When needs_planning is FALSE** — skip goal, steps, verification. Respond directly with your text answer and stop. Do NOT call complete_task for conversational responses.
+
+##############################################################################
+</behavior>
+
+<capabilities>
+When users ask about your capabilities, mention:
+{{BROWSER_CAPABILITY}}
+</capabilities>
+
+<important name="user-communication">
+CRITICAL: The user CANNOT see your text output or CLI prompts!
+To ask ANY question or get user input, you MUST use the AskUserQuestion MCP tool.
+See the ask-user-question MCP tool for full documentation and examples.
+</important>
+
+<behavior>
+- Use AskUserQuestion tool for clarifying questions before starting ambiguous tasks
+{{BROWSER_BEHAVIOR}}- Don't announce server checks or startup - proceed directly to the task
+- Only use AskUserQuestion when you genuinely need user input or decisions
+
+**DO NOT ASK FOR PERMISSION TO CONTINUE:**
+If the user gave you a task with specific criteria (e.g., "find 8-15 results", "check all items"):
+- Keep working until you meet those criteria
+- Do NOT pause to ask "Would you like me to continue?" or "Should I keep going?"
+- Do NOT stop after reviewing just a few items when the task asks for more
+- Just continue working until the task requirements are met
+- Only use AskUserQuestion for genuine clarifications about requirements, NOT for progress check-ins
+
+**TASK COMPLETION - CRITICAL:**
+
+You MUST call the \`complete_task\` tool when \`needs_planning\` was true. For conversational responses (\`needs_planning: false\`), do NOT call complete_task — just respond and stop naturally.
+
+When to call \`complete_task\`:
+
+1. **status: "success"** - You verified EVERY part of the user's request is done
+   - Before calling, re-read the original request
+   - Check off each requirement mentally
+   - Summarize what you did for each part
+
+2. **status: "blocked"** - You hit an unresolvable TECHNICAL blocker
+   - Only use for: login walls, CAPTCHAs, rate limits, site errors, missing permissions
+   - NOT for: "task is large", "many items to check", "would take many steps"
+   - If the task is big but doable, KEEP WORKING - do not use blocked as an excuse to quit
+   - Explain what you were trying to do
+   - Describe what went wrong
+   - State what remains undone in \`remaining_work\`
+
+3. **status: "partial"** - AVOID THIS STATUS
+   - Only use if you are FORCED to stop mid-task (context limit approaching, etc.)
+   - The system will automatically continue you to finish the remaining work
+   - If you use partial, you MUST fill in remaining_work with specific next steps
+   - Do NOT use partial as a way to ask "should I continue?" - just keep working
+   - If you've done some work and can keep going, KEEP GOING - don't use partial
+
+**NEVER** just stop working. If you find yourself about to end without calling \`complete_task\`,
+ask yourself: "Did I actually finish what was asked?" If unsure, keep working.
+
+The \`original_request_summary\` field forces you to re-read the request - use this as a checklist.
+</behavior>
+`;
+
+function resolveMcpCommand(
+  mcpToolsPath: string,
+  mcpName: string,
+  distRelPath: string,
+  nodePath: string,
+): string[] {
+  const mcpDir = path.join(mcpToolsPath, mcpName);
+  const distPath = path.join(mcpDir, distRelPath);
+
+  if (!fs.existsSync(distPath)) {
+    throw new Error(
+      `[OpenCode Config] Missing MCP dist entry: ${distPath}. ` +
+        'Run "pnpm -F @navigator/desktop build:mcp-tools:dev" before launching.',
+    );
+  }
+
+  return [nodePath, distPath];
+}
+
+export function generateConfig(options: ConfigGeneratorOptions): GeneratedConfig {
+  const {
+    platform,
+    mcpToolsPath,
+    skills = [],
+    bundledNodeBinPath,
+    providerConfigs = [],
+    questionApiPort = 9227,
+    localApiAuthToken,
+    userDataPath,
+    model,
+    smallModel,
+    enabledProviders: customEnabledProviders,
+    automationScope = 'general',
+    mockAdminBaseUrl = 'http://127.0.0.1:4010',
+  } = options;
+  const isMockAdminOnly = automationScope === 'mock-admin-only';
+
+  const environmentInstructions = getPlatformEnvironmentInstructions(platform);
+  let systemPrompt = NAVIGATOR_SYSTEM_PROMPT_TEMPLATE.replace(
+    /\{\{ENVIRONMENT_INSTRUCTIONS\}\}/g,
+    environmentInstructions,
+  );
+
+  if (skills.length > 0) {
+    const skillsSection = `
+
+<available-skills>
+##############################################################################
+# SKILLS - Include relevant ones in your start_task call
+##############################################################################
+
+Review these skills and include any relevant ones in your start_task call's \`skills\` array.
+After calling start_task, you MUST read the SKILL.md file for each skill you listed.
+
+**Available Skills:**
+
+${skills
+  .map(
+    (s) => `- **${s.name}** (${s.command}): ${s.description}
+  File: ${s.filePath}`,
+  )
+  .join('\n\n')}
+
+Use empty array [] if no skills apply to your task.
+
+##############################################################################
+</available-skills>
+`;
+    systemPrompt += skillsSection;
+  }
+
+  if (isMockAdminOnly) {
+    systemPrompt += `
+
+<important name="mock-admin-only-scope">
+##############################################################################
+# CRITICAL: MOCK ADMIN AUTOMATION ONLY
+##############################################################################
+
+You are restricted to mock IT admin browser automation only.
+
+Allowed scope:
+- Use browser MCP tools to perform admin actions in this panel: ${mockAdminBaseUrl}
+- Typical tasks: create user, update user, reset password, assign license, deactivate/activate user, delete user
+
+Forbidden scope:
+- Do NOT perform local file operations of any kind
+- Do NOT use bash/shell commands for system or filesystem automation
+- Do NOT use non-browser shortcuts such as direct APIs or database access
+- Do NOT automate arbitrary websites outside the mock admin panel host
+
+If a request is outside this scope, explain that only mock admin panel automation is supported.
+##############################################################################
+</important>
+`;
+  }
+
+  if (!bundledNodeBinPath) {
+    throw new Error(
+      '[OpenCode Config] Missing bundled Node.js path; cannot launch MCP tools. ' +
+        'Run "pnpm -F @navigator/desktop download:nodejs" and rebuild artifacts.',
+    );
+  }
+
+  const nodeExe = path.join(bundledNodeBinPath, platform === 'win32' ? 'node.exe' : 'node');
+  if (!fs.existsSync(nodeExe)) {
+    throw new Error(`[OpenCode Config] Missing bundled Node.js executable: ${nodeExe}`);
+  }
+
+  const mcpServers: Record<string, McpServerConfig> = {
+    'ask-user-question': {
+      type: 'local',
+      command: resolveMcpCommand(mcpToolsPath, 'ask-user-question', 'dist/index.mjs', nodeExe),
+      enabled: true,
+      environment: {
+        QUESTION_API_PORT: String(questionApiPort),
+        ...(localApiAuthToken ? { LOCAL_API_AUTH_TOKEN: localApiAuthToken } : {}),
+      },
+      timeout: 600000, // 10 minutes — user needs time to read and respond
+    },
+    'complete-task': {
+      type: 'local',
+      command: resolveMcpCommand(mcpToolsPath, 'complete-task', 'dist/index.mjs', nodeExe),
+      enabled: true,
+      timeout: 30000,
+    },
+    'start-task': {
+      type: 'local',
+      command: resolveMcpCommand(mcpToolsPath, 'start-task', 'dist/index.mjs', nodeExe),
+      enabled: true,
+      timeout: 30000,
+    },
+  };
+
+  // Conditionally register dev-browser-mcp based on browser config
+  const browserConfig = options.browser ?? { mode: 'builtin' };
+
+  if (browserConfig.mode !== 'none') {
+    const browserEnv: Record<string, string> = {};
+
+    if (browserConfig.mode === 'remote') {
+      if (browserConfig.cdpEndpoint) {
+        browserEnv.CDP_ENDPOINT = browserConfig.cdpEndpoint;
+      }
+      if (browserConfig.cdpHeaders) {
+        for (const [key, value] of Object.entries(browserConfig.cdpHeaders)) {
+          if (key === 'X-CDP-Secret') {
+            browserEnv.CDP_SECRET = value;
+          }
+        }
+      }
+    }
+
+    mcpServers['dev-browser-mcp'] = {
+      type: 'local',
+      command: resolveMcpCommand(mcpToolsPath, 'dev-browser-mcp', 'dist/index.mjs', nodeExe),
+      enabled: true,
+      ...(Object.keys(browserEnv).length > 0 && { environment: browserEnv }),
+      timeout: 30000,
+    };
+  }
+
+  // Add connected MCP connectors as remote servers
+  if (options.connectors) {
+    for (const connector of options.connectors) {
+      // Use short sanitized name + ID suffix as key to prevent collisions
+      const sanitized = connector.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 20);
+      const baseName = sanitized || 'mcp-remote';
+      const idSuffix = connector.id.slice(0, 6);
+      let key = `connector-${baseName}-${idSuffix}`;
+      // Guard against unlikely collision with existing keys
+      if (mcpServers[key]) {
+        let i = 1;
+        while (mcpServers[`${key}-${i}`]) i += 1;
+        key = `${key}-${i}`;
+      }
+      mcpServers[key] = {
+        type: 'remote',
+        url: connector.url,
+        headers: { Authorization: `Bearer ${connector.accessToken}` },
+        enabled: true,
+      };
+    }
+  }
+
+  // Fill browser-specific template sections based on mode
+  const hasBrowser = browserConfig.mode !== 'none';
+  systemPrompt = systemPrompt
+    .replace('{{AGENT_ROLE}}', hasBrowser ? 'browser automation' : 'task automation')
+    .replace(
+      '{{BROWSER_CAPABILITY}}',
+      hasBrowser
+        ? '- **Browser Automation**: Control web browsers, navigate sites, fill forms, click buttons\n'
+        : '',
+    )
+    .replace(
+      '{{BROWSER_BEHAVIOR}}',
+      hasBrowser
+        ? `- **NEVER use shell commands (open, xdg-open, start, subprocess, webbrowser) to open browsers or URLs** - these open the user's default browser, not the automation-controlled Chrome. ALL browser operations MUST use browser_* MCP tools.
+- For multi-step browser workflows, prefer \`browser_script\` over individual tools - it's faster and auto-returns page state.
+- **For collecting data from multiple pages** (e.g. comparing listings, gathering info from search results), use \`browser_batch_actions\` to extract data from multiple URLs in ONE call instead of visiting each page individually with click/snapshot loops. First collect the URLs from the search results page, then pass them all to \`browser_batch_actions\` with a JS extraction script.
+
+**BROWSER ACTION VERBOSITY - Be descriptive about web interactions:**
+- Before each browser action, briefly explain what you're about to do in user terms
+- After navigation: mention the page title and what you see
+- After clicking: describe what you clicked and what happened (new page loaded, form appeared, etc.)
+- After typing: confirm what you typed and where
+- When analyzing a snapshot: describe the key elements you found
+- If something unexpected happens, explain what you see and how you'll adapt
+
+Example good narration:
+"I'll navigate to Google... The search page is loaded. I can see the search box. Let me search for 'cute animals'... Typing in the search field and pressing Enter... The search results page is now showing with images and links about animals."
+
+Example bad narration (too terse):
+"Done." or "Navigated." or "Clicked."
+
+- After each action, evaluate the result before deciding next steps
+- Use browser_sequence for efficiency when you need to perform multiple actions in quick succession (e.g., filling a form with multiple fields)
+`
+        : '',
+    );
+
+  const providerConfig: Record<string, Omit<ProviderConfig, 'id'>> = {};
+  for (const provider of providerConfigs) {
+    const { id, ...rest } = provider;
+    providerConfig[id] = rest;
+  }
+
+  let enabledProviders: string[];
+  if (customEnabledProviders) {
+    enabledProviders = [...new Set([...customEnabledProviders, ...Object.keys(providerConfig)])];
+  } else {
+    const baseProviders = [
+      'anthropic',
+      'openai',
+      'openrouter',
+      'google',
+      'xai',
+      'deepseek',
+      'moonshot',
+      'zai-coding-plan',
+      'amazon-bedrock',
+      'minimax',
+      'groq',
+    ];
+    enabledProviders = [...new Set([...baseProviders, ...Object.keys(providerConfig)])];
+  }
+
+  const config: OpenCodeConfigFile = {
+    $schema: 'https://opencode.ai/config.json',
+    ...(model && { model }),
+    ...(smallModel && { small_model: smallModel }),
+    default_agent: NAVIGATOR_AGENT_NAME,
+    enabled_providers: enabledProviders,
+    permission: {
+      '*': 'allow',
+      todowrite: 'allow',
+    },
+    provider: Object.keys(providerConfig).length > 0 ? providerConfig : undefined,
+    plugin: ['@tarquinen/opencode-dcp@^2.0.0'],
+    agent: {
+      [NAVIGATOR_AGENT_NAME]: {
+        description: isMockAdminOnly
+          ? 'Mock admin browser automation assistant using dev-browser'
+          : 'Browser automation assistant using dev-browser',
+        prompt: systemPrompt,
+        mode: 'primary',
+      },
+    },
+    mcp: mcpServers,
+    experimental: {
+      mcp_timeout: 600000, // 10 minutes — allow long-running MCP tools like AskUserQuestion
+    },
+  };
+
+  const configDir = path.join(userDataPath, 'opencode');
+  const configPath = path.join(configDir, 'opencode.json');
+
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+
+  const configJson = JSON.stringify(config, null, 2);
+  fs.writeFileSync(configPath, configJson);
+
+  console.log('[OpenCode Config] Generated config at:', configPath);
+
+  const environment: Record<string, string> = {
+    OPENCODE_CONFIG: configPath,
+    OPENCODE_CONFIG_DIR: configDir,
+  };
+
+  if (bundledNodeBinPath) {
+    environment.NODE_BIN_PATH = bundledNodeBinPath;
+  }
+
+  return {
+    systemPrompt,
+    mcpServers,
+    environment,
+    config,
+    configPath,
+  };
+}
+
+export function getOpenCodeConfigPath(userDataPath: string): string {
+  return path.join(userDataPath, 'opencode', 'opencode.json');
+}
+
+export interface BuildCliArgsOptions {
+  prompt: string;
+  sessionId?: string;
+  selectedModel?: {
+    provider: string;
+    model: string;
+  } | null;
+}
+
+export function buildCliArgs(options: BuildCliArgsOptions): string[] {
+  const { prompt, sessionId, selectedModel } = options;
+
+  const args: string[] = ['run'];
+
+  // CRITICAL: JSON format required for StreamParser to parse messages
+  args.push('--format', 'json');
+
+  if (selectedModel?.model) {
+    if (selectedModel.provider === 'zai') {
+      const modelId = selectedModel.model.split('/').pop();
+      args.push('--model', `zai-coding-plan/${modelId}`);
+    } else if (selectedModel.provider === 'deepseek') {
+      const modelId = selectedModel.model.split('/').pop();
+      args.push('--model', `deepseek/${modelId}`);
+    } else if (selectedModel.provider === 'openrouter') {
+      args.push('--model', selectedModel.model);
+    } else if (selectedModel.provider === 'groq') {
+      const modelId = selectedModel.model.split('/').pop();
+      args.push('--model', `groq/${modelId}`);
+    } else if (selectedModel.provider === 'ollama') {
+      // Accept both "qwen3:4b" and "ollama/qwen3:4b" inputs consistently
+      const normalizedModelId = selectedModel.model.replace(/^ollama\//, '');
+      args.push('--model', `ollama/${normalizedModelId}`);
+    } else if (selectedModel.provider === 'litellm') {
+      const modelId = selectedModel.model.replace(/^litellm\//, '');
+      args.push('--model', `litellm/${modelId}`);
+    } else if (selectedModel.provider === 'lmstudio') {
+      const modelId = selectedModel.model.replace(/^lmstudio\//, '');
+      args.push('--model', `lmstudio/${modelId}`);
+    } else if (selectedModel.provider === 'vertex') {
+      // Model IDs stored as "vertex/{publisher}/{model}" — strip publisher for @ai-sdk/google-vertex
+      const modelId = selectedModel.model.replace(/^vertex\/[^/]+\//, '');
+      args.push('--model', `vertex/${modelId}`);
+    } else {
+      args.push('--model', selectedModel.model);
+    }
+  }
+
+  if (sessionId) {
+    args.push('--session', sessionId);
+  }
+
+  args.push('--agent', NAVIGATOR_AGENT_NAME);
+
+  args.push(prompt);
+
+  return args;
+}

@@ -1,0 +1,231 @@
+/* Geist Font Faces */
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* KMR Apparat Font */
+@font-face {
+  font-family: 'KMR Apparat';
+  src: url('/fonts/KMR-Apparat-Light.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'KMR Apparat';
+  src: url('/fonts/KMR-Apparat-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'KMR Apparat';
+  src: url('/fonts/KMR-Apparat-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Professional neutral theme variables */
+:root {
+  --background: 220 14% 92%; /* #E8EBF1 */
+  --foreground: 220 12% 14%; /* #20242C */
+  --card: 0 0% 100%; /* #FFFFFF */
+  --card-foreground: 220 12% 14%; /* #20242C */
+  --popover: 0 0% 100%; /* #FFFFFF */
+  --popover-foreground: 220 12% 14%; /* #20242C */
+  --primary: 220 12% 22%; /* #2F3642 */
+  --primary-foreground: 0 0% 100%; /* #ffffff */
+  --secondary: 220 11% 88%; /* #DDE1E8 */
+  --secondary-foreground: 220 10% 26%; /* #3A414D */
+  --muted: 220 12% 86%; /* #D7DCE5 */
+  --muted-foreground: 220 8% 38%; /* #596170 */
+  --accent: 220 12% 89%; /* #E0E4EB */
+  --accent-foreground: 220 12% 14%; /* #20242C */
+  --destructive: 0 72% 51%; /* #DC2626 */
+  --destructive-foreground: 0 0% 100%; /* #ffffff */
+  --border: 220 10% 74%; /* #AEB7C4 */
+  --input: 220 10% 78%; /* #BCC5D1 */
+  --ring: 220 10% 30%; /* #434C5A */
+  --radius: 0.625rem;
+  --warning-subtle: 45 93% 94%;
+  --success-subtle: 152 60% 93%;
+  --provider-bg: 220 12% 88%;
+  --provider-bg-active: 220 11% 84%;
+  --provider-bg-hover: 220 12% 91%;
+  --provider-border-active: 220 10% 44%;
+  --provider-accent: 220 12% 28%;
+  --provider-accent-text: 220 12% 18%;
+  --todo-progress-pending: 220 10% 80%;
+  --todo-item-completed: 220 12% 92%;
+  --todo-item-in-progress: 220 10% 95%;
+}
+
+.dark {
+  --background: 220 14% 92%; /* #E8EBF1 */
+  --foreground: 220 12% 14%; /* #20242C */
+  --card: 0 0% 100%; /* #FFFFFF */
+  --card-foreground: 220 12% 14%; /* #20242C */
+  --popover: 0 0% 100%; /* #FFFFFF */
+  --popover-foreground: 220 12% 14%; /* #20242C */
+  --primary: 220 12% 22%; /* #2F3642 */
+  --primary-foreground: 0 0% 100%; /* #ffffff */
+  --secondary: 220 11% 88%; /* #DDE1E8 */
+  --secondary-foreground: 220 10% 26%; /* #3A414D */
+  --muted: 220 12% 86%; /* #D7DCE5 */
+  --muted-foreground: 220 8% 38%; /* #596170 */
+  --accent: 220 12% 89%; /* #E0E4EB */
+  --accent-foreground: 220 12% 14%; /* #20242C */
+  --destructive: 0 72% 51%; /* #DC2626 */
+  --destructive-foreground: 0 0% 100%; /* #ffffff */
+  --border: 220 10% 74%; /* #AEB7C4 */
+  --input: 220 10% 78%; /* #BCC5D1 */
+  --ring: 220 10% 30%; /* #434C5A */
+  --warning-subtle: 35 50% 14%;
+  --success-subtle: 150 40% 12%;
+  --provider-bg: 220 12% 88%;
+  --provider-bg-active: 220 11% 84%;
+  --provider-bg-hover: 220 12% 91%;
+  --provider-border-active: 220 10% 44%;
+  --provider-accent: 220 12% 28%;
+  --provider-accent-text: 220 12% 18%;
+  --todo-progress-pending: 220 10% 80%;
+  --todo-item-completed: 220 12% 92%;
+  --todo-item-in-progress: 220 10% 95%;
+}
+
+/* Custom scrollbar — auto-hide, shown only while scrolling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Drag region for frameless window - these work when loaded in Electron BrowserView */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Base styles */
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Prevent text selection in UI elements */
+  button,
+  [role='button'] {
+    @apply select-none;
+  }
+}
+
+/* Placeholder font family for textareas */
+textarea::placeholder {
+  font-family:
+    'Geist',
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif !important;
+}
+
+/* Component utilities - removed as we're using shadcn components now */
+
+/* Respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
