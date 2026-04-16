@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block content %}
+<section>
+  <h2>Add New User</h2>
+  <form method="post" action="{{ url_for('create_user') }}" class="stacked-form">
+    <label for="create-email">Email</label>
+    <input id="create-email" name="email" type="email" required>
+
+    <label for="create-full-name">Full Name</label>
+    <input id="create-full-name" name="full_name" type="text" required>
+
+    <label for="create-role">Role</label>
+    <select id="create-role" name="role">
+      <option value="admin">admin</option>
+      <option value="user" selected>user</option>
+      <option value="viewer">viewer</option>
+    </select>
+
+    <label for="create-password">Initial Password</label>
+    <input id="create-password" name="initial_password" type="text" required>
+
+    <button type="submit">Create User</button>
+  </form>
+</section>
+
+<section>
+  <h2>User Management</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Email</th>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Status</th>
+        <th>Licenses</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in users %}
+      <tr>
+        <td>{{ user.email }}</td>
+        <td>{{ user.full_name }}</td>
+        <td>{{ user.role }}</td>
+        <td>{{ user.status }}</td>
+        <td>{{ user.products if user.products else 'None' }}</td>
+        <td>
+          <div class="action-block">
+            <form method="post" action="{{ url_for('reset_password', user_id=user.id) }}">
+              <label for="new-password-{{ user.id }}">New Password for {{ user.email }}</label>
+              <input id="new-password-{{ user.id }}" name="new_password" type="text" placeholder="Temp#123" required>
+              <button type="submit">Reset Password {{ user.email }}</button>
+            </form>
+
+            <form method="post" action="{{ url_for('toggle_status', user_id=user.id) }}">
+              <button type="submit">{% if user.status == 'active' %}Disable{% else %}Enable{% endif %} {{ user.email }}</button>
+            </form>
+
+            <form method="post" action="{{ url_for('assign_license', user_id=user.id) }}">
+              <label for="license-{{ user.id }}">License for {{ user.email }}</label>
+              <select id="license-{{ user.id }}" name="product">
+                {% for product in license_products %}
+                  <option value="{{ product }}">{{ product }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit">Assign License {{ user.email }}</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

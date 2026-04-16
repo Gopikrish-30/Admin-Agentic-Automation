@@ -101,6 +101,20 @@ import { getTelegramService } from '../telegram';
 const API_KEY_VALIDATION_TIMEOUT_MS = 15000;
 const MOCK_ADMIN_PANEL_URL = process.env.MOCK_ADMIN_PANEL_URL || 'http://127.0.0.1:4010';
 
+function isActionableMockAdminPrompt(prompt: string): boolean {
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return (
+    /(create|add|update|edit|change|delete|remove|reset|assign|check|find|search|enable|disable)/.test(
+      normalized,
+    ) &&
+    /(user|password|license|account|role)/.test(normalized)
+  );
+}
+
 function buildMockAdminOnlyPrompt(userPrompt: string): string {
   return [
     `You are executing a mock IT admin automation request against ${MOCK_ADMIN_PANEL_URL}.`,
@@ -159,6 +173,43 @@ export function registerIPCHandlers(): void {
     const sender = event.sender;
     const validatedConfig = validateTaskConfig(config);
     const originalPrompt = validatedConfig.prompt;
+
+    if (!isActionableMockAdminPrompt(originalPrompt)) {
+      const taskId = createTaskId();
+      const now = new Date().toISOString();
+
+      const userMessage: TaskMessage = {
+        id: createMessageId(),
+        type: 'user',
+        content: originalPrompt,
+        timestamp: now,
+      };
+
+      const assistantMessage: TaskMessage = {
+        id: createMessageId(),
+        type: 'assistant',
+        content:
+          'Please provide a mock admin action such as: check/create user, reset password, or assign license.',
+        timestamp: now,
+      };
+
+      const task = {
+        id: taskId,
+        prompt: originalPrompt,
+        status: 'completed' as const,
+        messages: [userMessage, assistantMessage],
+        createdAt: now,
+        completedAt: now,
+        result: {
+          status: 'success' as const,
+          sessionId: undefined,
+        },
+      };
+
+      storage.saveTask(task);
+      return task;
+    }
+
     validatedConfig.prompt = buildMockAdminOnlyPrompt(originalPrompt);
 
     if (!storage.hasReadyProvider()) {
@@ -189,18 +240,19 @@ export function registerIPCHandlers(): void {
     });
 
     const task = await taskManager.startTask(taskId, validatedConfig, callbacks);
+    task.prompt = originalPrompt;
 
     const initialUserMessage: TaskMessage = {
       id: createMessageId(),
       type: 'user',
-      content: validatedConfig.prompt,
+      content: originalPrompt,
       timestamp: new Date().toISOString(),
     };
     task.messages = [initialUserMessage];
 
     storage.saveTask(task);
 
-    generateTaskSummary(validatedConfig.prompt, getApiKey)
+    generateTaskSummary(originalPrompt, getApiKey)
       .then((summary) => {
         storage.updateTaskSummary(taskId, summary);
         if (!window.isDestroyed() && !sender.isDestroyed()) {

@@ -35,10 +35,11 @@ export class SecureStorage {
   private appId: string;
   private filePath: string;
   private derivedKey: Buffer | null = null;
-    private masterKey: Buffer | null = null;
+  private masterKey: Buffer | null = null;
   private data: SecureStorageSchema | null = null;
   private osEncrypt?: (plaintext: Buffer) => Buffer;
   private osDecrypt?: (ciphertext: Buffer) => Buffer;
+  private vaultRecoveryAttempted = false;
 
   constructor(options: SecureStorageOptions) {
     this.storagePath = options.storagePath;
@@ -106,6 +107,60 @@ export class SecureStorage {
     return Buffer.from(data.salt, 'base64');
   }
 
+  private resetAfterVaultDecryptionFailure(data: SecureStorageSchema): Buffer {
+    if (this.vaultRecoveryAttempted) {
+      // Avoid repeated vault operations when the credential store is unavailable.
+      this.osEncrypt = undefined;
+      this.osDecrypt = undefined;
+    }
+    this.vaultRecoveryAttempted = true;
+
+    console.warn(
+      '[SecureStorage] Resetting secure storage after OS vault decryption failure. Stored secrets will need to be re-entered.',
+    );
+
+    data.values = {};
+    delete data.masterKeyEncrypted;
+    delete data.keyVersion;
+    delete data.salt;
+    this.masterKey = null;
+    this.derivedKey = null;
+
+    if (this.osEncrypt) {
+      try {
+        const newMasterKey = crypto.randomBytes(32);
+        const encryptedMasterKey = this.osEncrypt(newMasterKey);
+        data.masterKeyEncrypted = encryptedMasterKey.toString('base64');
+        data.keyVersion = 2;
+        this.masterKey = newMasterKey;
+        this.saveData();
+        return this.masterKey;
+      } catch (error) {
+        console.warn(
+          '[SecureStorage] OS vault encryption unavailable during recovery. Falling back to machine-derived key.',
+          error,
+        );
+
+        // Disable vault usage for this process so we do not repeatedly fail.
+        this.osEncrypt = undefined;
+        this.osDecrypt = undefined;
+      }
+    }
+
+    const machineData = [os.platform(), os.homedir(), os.userInfo().username, this.appId].join(':');
+    try {
+      const salt = this.getSalt();
+      this.derivedKey = crypto.pbkdf2Sync(machineData, salt, 100000, 32, 'sha256');
+      this.saveData();
+    } catch (error) {
+      // Last-resort fallback: keep the app usable even if persistence is temporarily unavailable.
+      console.warn('[SecureStorage] Failed to persist recovery state. Using in-memory key fallback.', error);
+      const ephemeralSalt = crypto.randomBytes(32);
+      this.derivedKey = crypto.pbkdf2Sync(machineData, ephemeralSalt, 100000, 32, 'sha256');
+    }
+    return this.derivedKey;
+  }
+
   /**
    * Get the master encryption key - either from OS keychain or machine-derived fallback
    */
@@ -124,19 +179,28 @@ export class SecureStorage {
         return this.masterKey;
       } catch (error) {
         console.error('[SecureStorage] Failed to decrypt master key from OS vault:', error);
-        throw new Error('Failed to decrypt master key from OS credential vault');
+        return this.resetAfterVaultDecryptionFailure(data);
       }
     }
 
     // Initialize with OS encryption if available and no keys exist yet
     if (this.osEncrypt && !data.keyVersion && Object.keys(data.values).length === 0) {
-      const newMasterKey = crypto.randomBytes(32);
-      const encryptedMasterKey = this.osEncrypt(newMasterKey);
-      data.masterKeyEncrypted = encryptedMasterKey.toString('base64');
-      data.keyVersion = 2;
-      this.masterKey = newMasterKey;
-      this.saveData();
-      return this.masterKey;
+      try {
+        const newMasterKey = crypto.randomBytes(32);
+        const encryptedMasterKey = this.osEncrypt(newMasterKey);
+        data.masterKeyEncrypted = encryptedMasterKey.toString('base64');
+        data.keyVersion = 2;
+        this.masterKey = newMasterKey;
+        this.saveData();
+        return this.masterKey;
+      } catch (error) {
+        console.warn(
+          '[SecureStorage] OS vault encryption unavailable during initialization. Falling back to machine-derived key.',
+          error,
+        );
+        this.osEncrypt = undefined;
+        this.osDecrypt = undefined;
+      }
     }
 
     // Version 1 or no version (legacy): Machine-derived key
@@ -150,8 +214,17 @@ export class SecureStorage {
 
     // Migrate to OS-encrypted storage if callbacks are available and not already migrated
     if (this.osEncrypt && !data.keyVersion && Object.keys(data.values).length > 0) {
-      this.migrateToOSEncryption();
-      return this.masterKey!; // After migration, masterKey is set
+      try {
+        this.migrateToOSEncryption();
+        return this.masterKey!; // After migration, masterKey is set
+      } catch (error) {
+        console.warn(
+          '[SecureStorage] OS vault migration unavailable. Continuing with machine-derived key.',
+          error,
+        );
+        this.osEncrypt = undefined;
+        this.osDecrypt = undefined;
+      }
     }
 
     return this.derivedKey;

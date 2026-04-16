@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IT Agent Chat</title>
+  <style>
+    :root {
+      --bg: #eef2f8;
+      --card: #ffffff;
+      --card-border: #dce3ee;
+      --text: #16233a;
+      --muted: #596b88;
+      --accent: #4f46e5;
+      --accent-strong: #4338ca;
+      --soft: #f6f8fc;
+      --soft-2: #f2f5fa;
+      --ok: #107c41;
+      --bad: #b42318;
+      --stream-bg: #07152b;
+      --stream-text: #d8efff;
+      --mono: "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas, monospace;
+      --sans: "Geist", "DM Sans", "Avenir Next", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #d9e3ff 0%, transparent 60%),
+        radial-gradient(900px 420px at 92% 8%, #ddeed9 0%, transparent 58%),
+        var(--bg);
+      min-height: 100vh;
+      padding: 18px;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid #d9e1ec;
+      border-radius: 18px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 18px 50px rgba(17, 33, 62, 0.08);
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 18px 18px 12px;
+      border-bottom: 1px solid var(--card-border);
+      background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    }
+
+    .title {
+      margin: 0;
+      font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+
+    .hint {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .pills {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      border: 1px solid #cfd8e6;
+      background: #fff;
+      color: #284164;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+
+    .composer {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--card-border);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      background: #fbfdff;
+    }
+
+    input, button, select {
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid #c9d5e6;
+      padding: 11px 12px;
+    }
+
+    #task, #answerInput {
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    #task:focus, #answerInput:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.14);
+    }
+
+    button {
+      cursor: pointer;
+      border-color: var(--accent);
+      color: #fff;
+      background: linear-gradient(180deg, #5a52eb 0%, #4f46e5 70%, #463ed8 100%);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      transition: transform .12s ease, box-shadow .12s ease, filter .12s ease;
+    }
+
+    button:hover { filter: brightness(1.03); }
+    button:active { transform: translateY(1px); }
+
+    .secondary {
+      background: #fff;
+      color: #1e3557;
+      border-color: #c9d5e6;
+      font-weight: 600;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 330px 1fr;
+      gap: 0;
+      min-height: 520px;
+    }
+
+    .sidebar {
+      border-right: 1px solid var(--card-border);
+      background: linear-gradient(180deg, #fbfdff 0%, #f4f8ff 100%);
+      padding: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--card-border);
+      background: #fff;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 8px 18px rgba(22, 35, 58, 0.04);
+    }
+
+    .card h3 {
+      margin: 0 0 10px;
+      font-size: 0.96rem;
+      letter-spacing: 0.01em;
+      color: #294166;
+    }
+
+    .todos ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .todos li {
+      border: 1px solid #dde5f0;
+      border-radius: 10px;
+      background: #f8fbff;
+      padding: 8px 10px;
+      font-size: 13px;
+      color: #203a5e;
+      line-height: 1.35;
+    }
+
+    .main {
+      padding: 14px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 10px;
+      background: #f7faff;
+    }
+
+    .log {
+      height: 100%;
+      min-height: 420px;
+      overflow: auto;
+      background: linear-gradient(180deg, #071730 0%, #071222 100%);
+      color: var(--stream-text);
+      border-radius: 12px;
+      border: 1px solid #123056;
+      padding: 12px;
+      font-family: var(--mono);
+      font-size: 13px;
+      white-space: pre-wrap;
+      box-shadow: inset 0 1px 0 rgba(173, 220, 255, 0.05);
+    }
+
+    .question {
+      display: none;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      border: 1px solid #d6dfec;
+      border-radius: 12px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .providerModal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(9, 17, 31, 0.55);
+      padding: 12px;
+      z-index: 20;
+    }
+
+    .providerCard {
+      width: min(760px, 96vw);
+      background: #fff;
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 20px 60px rgba(8, 19, 38, 0.26);
+    }
+
+    .providerGrid {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .providerActions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    .statusOk { color: var(--ok); font-weight: 700; }
+    .statusBad { color: var(--bad); font-weight: 700; }
+
+    @media (max-width: 980px) {
+      body { padding: 10px; }
+      .header { flex-direction: column; align-items: stretch; }
+      .pills { justify-content: flex-start; }
+      .composer { grid-template-columns: 1fr; }
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 1px solid var(--card-border); }
+      .log { min-height: 300px; }
+      .providerGrid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div>
+        <h1 class="title">IT Support Agent</h1>
+        <p class="hint">Navigator-style local execution with OpenAI Codex OAuth</p>
+      </div>
+      <div class="pills">
+        <span class="pill" id="providerPill">Provider: OpenAI Codex</span>
+        <span class="pill" id="modelPill">Model: ...</span>
+        <span class="pill" id="oauthPill">OAuth: Unknown</span>
+        <button id="providerBtn" class="secondary" type="button">LLM Provider</button>
+      </div>
+    </header>
+
+    <section class="composer">
+      <input id="task" placeholder="Enter natural language IT support request">
+      <button id="run">Run Task</button>
+    </section>
+
+    <section class="layout">
+      <aside class="sidebar">
+        <div class="card todos">
+          <h3>Todo List</h3>
+          <ul id="todoList"></ul>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div id="log" class="log"></div>
+        <div id="questionBox" class="question">
+          <input id="answerInput" placeholder="Agent asked a question. Type your answer.">
+          <button id="sendAnswer">Send Answer</button>
+        </div>
+      </main>
+    </section>
+  </div>
+
+  <div id="providerModal" class="providerModal">
+    <div class="providerCard">
+      <h2 style="margin:0 0 12px">LLM Provider</h2>
+      <div class="providerGrid">
+        <label>Provider</label>
+        <strong>OpenAI Codex</strong>
+
+        <label>Authorization</label>
+        <div>
+          <span id="oauthStatus" class="statusBad">Not connected</span>
+          <button id="authorizeBtn" class="secondary" type="button" style="margin-left:8px">Authorize OpenAI Codex</button>
+          <button id="refreshProviderBtn" class="secondary" type="button" style="margin-left:8px">Refresh Status</button>
+        </div>
+
+        <label for="modelSelect">Codex Model</label>
+        <select id="modelSelect"></select>
+      </div>
+
+      <div id="providerMsg" class="hint" style="margin-top:10px"></div>
+
+      <div class="providerActions">
+        <button id="closeProviderBtn" class="secondary" type="button">Close</button>
+        <button id="saveProviderBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const taskInput = document.getElementById('task');
+    const runBtn = document.getElementById('run');
+    const providerBtn = document.getElementById('providerBtn');
+    const logEl = document.getElementById('log');
+    const todoList = document.getElementById('todoList');
+    const questionBox = document.getElementById('questionBox');
+    const answerInput = document.getElementById('answerInput');
+    const sendAnswer = document.getElementById('sendAnswer');
+    const providerModal = document.getElementById('providerModal');
+    const oauthStatus = document.getElementById('oauthStatus');
+    const authorizeBtn = document.getElementById('authorizeBtn');
+    const refreshProviderBtn = document.getElementById('refreshProviderBtn');
+    const closeProviderBtn = document.getElementById('closeProviderBtn');
+    const saveProviderBtn = document.getElementById('saveProviderBtn');
+    const modelSelect = document.getElementById('modelSelect');
+    const providerMsg = document.getElementById('providerMsg');
+    const providerPill = document.getElementById('providerPill');
+    const modelPill = document.getElementById('modelPill');
+    const oauthPill = document.getElementById('oauthPill');
+    let stream = null;
+    let activeTaskId = null;
+
+    function setProviderMessage(text) {
+      providerMsg.textContent = text || '';
+    }
+
+    function showProviderModal() {
+      providerModal.style.display = 'flex';
+    }
+
+    function hideProviderModal() {
+      providerModal.style.display = 'none';
+    }
+
+    async function refreshProviderStatus() {
+      setProviderMessage('Loading provider status...');
+      const res = await fetch('/llm/provider');
+      if (!res.ok) {
+        setProviderMessage('Failed to load provider status.');
+        return;
+      }
+      const data = await res.json();
+
+      providerPill.textContent = 'Provider: OpenAI Codex';
+      modelPill.textContent = 'Model: ' + data.model;
+
+      modelSelect.innerHTML = '';
+      for (const model of data.allowedModels || []) {
+        const option = document.createElement('option');
+        option.value = model;
+        option.textContent = model;
+        if (model === data.model) {
+          option.selected = true;
+        }
+        modelSelect.appendChild(option);
+      }
+
+      if (data.oauth && data.oauth.connected) {
+        oauthStatus.textContent = 'Connected';
+        oauthStatus.className = 'statusOk';
+        oauthPill.textContent = 'OAuth: Connected';
+        oauthPill.style.borderColor = '#9fd8b7';
+        oauthPill.style.color = '#126737';
+      } else {
+        oauthStatus.textContent = 'Not connected';
+        oauthStatus.className = 'statusBad';
+        oauthPill.textContent = 'OAuth: Not connected';
+        oauthPill.style.borderColor = '#efc2be';
+        oauthPill.style.color = '#9a2c21';
+      }
+      setProviderMessage('OpenAI Codex provider only. No API key mode via OpenCode OAuth.');
+    }
+
+    providerBtn.addEventListener('click', async () => {
+      showProviderModal();
+      await refreshProviderStatus();
+    });
+
+    closeProviderBtn.addEventListener('click', () => {
+      hideProviderModal();
+    });
+
+    refreshProviderBtn.addEventListener('click', async () => {
+      await refreshProviderStatus();
+    });
+
+    authorizeBtn.addEventListener('click', async () => {
+      setProviderMessage('Opening OpenCode login terminal...');
+      const res = await fetch('/llm/openai/authorize', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setProviderMessage(data.error || 'Failed to start authorization.');
+        return;
+      }
+      setProviderMessage(data.message || 'Authorization started. Complete login and refresh status.');
+    });
+
+    saveProviderBtn.addEventListener('click', async () => {
+      const body = {
+        provider: 'openai-codex',
+        model: modelSelect.value,
+      };
+      const res = await fetch('/llm/provider', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setProviderMessage(data.error || 'Failed to save provider settings.');
+        return;
+      }
+      setProviderMessage('Provider saved. OpenAI Codex model updated.');
+    });
+
+    function append(line) {
+      logEl.textContent += line + "\n";
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function normalizeStreamEvent(payload) {
+      const level = payload.level || mapEventTypeToLevel(payload.eventType) || 'event';
+      const message = typeof payload.message === 'string' ? payload.message : '';
+      return { level, message, payload };
+    }
+
+    function mapEventTypeToLevel(eventType) {
+      if (!eventType) {
+        return '';
+      }
+      const mapping = {
+        'run.status': 'status',
+        'agent.thought': 'thought',
+        'agent.action': 'action',
+        'agent.todo': 'todo',
+        'agent.question': 'question',
+        'user.answer': 'answer',
+        'assistant.message': 'assistant',
+        'run.error': 'error',
+        'run.final': 'final',
+      };
+      return mapping[eventType] || '';
+    }
+
+    function renderTodos(todos) {
+      todoList.innerHTML = '';
+      if (!Array.isArray(todos)) {
+        return;
+      }
+      for (const todo of todos) {
+        const li = document.createElement('li');
+        li.textContent = `[${todo.status}] ${todo.title}`;
+        todoList.appendChild(li);
+      }
+    }
+
+    async function sendAnswerToTask() {
+      const answer = answerInput.value.trim();
+      if (!activeTaskId || !answer) {
+        return;
+      }
+      const res = await fetch('/task-answer/' + activeTaskId, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answer })
+      });
+      if (res.ok) {
+        append('Answer submitted: ' + answer);
+        answerInput.value = '';
+        questionBox.style.display = 'none';
+      } else {
+        append('Failed to submit answer.');
+      }
+    }
+
+    sendAnswer.addEventListener('click', sendAnswerToTask);
+    answerInput.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        void sendAnswerToTask();
+      }
+    });
+
+    runBtn.addEventListener('click', async () => {
+      const task = taskInput.value.trim();
+      if (!task) {
+        append('Please enter a task.');
+        return;
+      }
+
+      if (stream) {
+        stream.close();
+      }
+
+      logEl.textContent = '';
+      todoList.innerHTML = '';
+      questionBox.style.display = 'none';
+      append('Submitting task...');
+
+      const res = await fetch('/run-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        append('Failed to submit task: ' + (err.error || 'unknown error'));
+        return;
+      }
+
+      const data = await res.json();
+      activeTaskId = data.taskId;
+      append('Task ID: ' + data.taskId);
+
+      stream = new EventSource('/task-stream/' + data.taskId);
+      stream.addEventListener('message', (event) => {
+        let payload = null;
+        try {
+          payload = JSON.parse(event.data);
+        } catch (_err) {
+          append(event.data);
+          return;
+        }
+
+        const normalized = normalizeStreamEvent(payload);
+
+        if (normalized.level === 'todo') {
+          try {
+            renderTodos(JSON.parse(normalized.message));
+          } catch (_err) {
+            append('Todo update parse error');
+          }
+          return;
+        }
+
+        if (normalized.level === 'question') {
+          append('Agent question: ' + normalized.message);
+          questionBox.style.display = 'grid';
+          answerInput.focus();
+          return;
+        }
+
+        append(`[${normalized.level}] ${normalized.message}`);
+      });
+      stream.addEventListener('done', () => {
+        append('Task stream complete.');
+        questionBox.style.display = 'none';
+        stream.close();
+      });
+      stream.onerror = () => {
+        append('Stream disconnected.');
+      };
+    });
+
+    void refreshProviderStatus();
+  </script>
+</body>
+</html>

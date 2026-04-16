@@ -56,6 +56,29 @@ interface TodoRow {
 }
 
 const MAX_HISTORY_ITEMS = 100;
+const MOCK_ADMIN_PROMPT_PREFIX = 'You are executing a mock IT admin automation request against ';
+
+function extractWrappedMockAdminUserRequest(content: string): string | null {
+  if (!content.startsWith(MOCK_ADMIN_PROMPT_PREFIX)) {
+    return null;
+  }
+
+  const match = content.match(/(?:\r?\n)User request:\s*([\s\S]*)$/i);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const extracted = match[1].trim();
+  return extracted.length > 0 ? extracted : null;
+}
+
+function sanitizePromptForDisplay(prompt: string): string {
+  return extractWrappedMockAdminUserRequest(prompt) ?? prompt;
+}
+
+function sanitizeUserMessageForDisplay(content: string): string {
+  return extractWrappedMockAdminUserRequest(content) ?? content;
+}
 
 function getMessagesForTask(taskId: string): TaskMessage[] {
   const db = getDatabase();
@@ -92,7 +115,7 @@ function getMessagesForTask(taskId: string): TaskMessage[] {
     messages.push({
       id: row.id,
       type: row.type as TaskMessage['type'],
-      content: row.content,
+      content: row.type === 'user' ? sanitizeUserMessageForDisplay(row.content) : row.content,
       toolName: row.tool_name || undefined,
       toolInput: parsedToolInput,
       timestamp: row.timestamp,
@@ -106,7 +129,7 @@ function getMessagesForTask(taskId: string): TaskMessage[] {
 function rowToTask(row: TaskRow): StoredTask {
   return {
     id: row.id,
-    prompt: row.prompt,
+    prompt: sanitizePromptForDisplay(row.prompt),
     summary: row.summary || undefined,
     status: row.status as TaskStatus,
     sessionId: row.session_id || undefined,
@@ -267,6 +290,47 @@ export function setMaxHistoryItems(_max: number): void {}
 
 export function clearTaskHistoryStore(): void {
   clearHistory();
+}
+
+export function sanitizeLegacyMockAdminPromptsInHistory(): number {
+  const db = getDatabase();
+
+  const taskRows = db
+    .prepare('SELECT id, prompt FROM tasks WHERE prompt LIKE ?')
+    .all(`${MOCK_ADMIN_PROMPT_PREFIX}%`) as Array<{ id: string; prompt: string }>;
+
+  const messageRows = db
+    .prepare("SELECT id, content FROM task_messages WHERE type = 'user' AND content LIKE ?")
+    .all(`${MOCK_ADMIN_PROMPT_PREFIX}%`) as Array<{ id: string; content: string }>;
+
+  if (taskRows.length === 0 && messageRows.length === 0) {
+    return 0;
+  }
+
+  const updateTaskPrompt = db.prepare('UPDATE tasks SET prompt = ? WHERE id = ?');
+  const updateMessageContent = db.prepare('UPDATE task_messages SET content = ? WHERE id = ?');
+
+  let updated = 0;
+
+  db.transaction(() => {
+    for (const row of taskRows) {
+      const sanitized = sanitizePromptForDisplay(row.prompt);
+      if (sanitized !== row.prompt) {
+        updateTaskPrompt.run(maskPii(sanitized), row.id);
+        updated += 1;
+      }
+    }
+
+    for (const row of messageRows) {
+      const sanitized = sanitizeUserMessageForDisplay(row.content);
+      if (sanitized !== row.content) {
+        updateMessageContent.run(maskPii(sanitized), row.id);
+        updated += 1;
+      }
+    }
+  })();
+
+  return updated;
 }
 
 export function flushPendingTasks(): void {}

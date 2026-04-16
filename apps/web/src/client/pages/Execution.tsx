@@ -30,6 +30,7 @@ import { MessageBubble } from '../components/execution/MessageList';
 import { ToolProgress } from '../components/execution/ToolProgress';
 import { PermissionDialog } from '../components/execution/PermissionDialog';
 import { DebugPanel, type DebugLogEntry } from '../components/execution/DebugPanel';
+import { sanitizePromptForDisplay } from '../lib/prompt-sanitizer';
 
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let timeoutId: ReturnType<typeof setTimeout>;
@@ -335,6 +336,8 @@ export function ExecutionPage() {
     );
   }
 
+  const displayPrompt = sanitizePromptForDisplay(currentTask.prompt);
+
   const taskErrorMessage = currentTask.result?.status === 'error' ? currentTask.result.error : null;
 
   const getStatusBadge = () => {
@@ -415,7 +418,7 @@ export function ExecutionPage() {
               </Button>
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <h1 className="text-base font-medium text-foreground truncate min-w-0">
-                  {currentTask.prompt}
+                  {displayPrompt}
                 </h1>
                 <span data-testid="execution-status-badge">{getStatusBadge()}</span>
               </div>

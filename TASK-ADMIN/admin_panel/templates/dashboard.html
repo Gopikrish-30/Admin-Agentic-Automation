@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="cards">
+  <article class="card">
+    <h2>Total Users</h2>
+    <p class="metric">{{ total_users }}</p>
+  </article>
+  <article class="card">
+    <h2>Active Users</h2>
+    <p class="metric">{{ active_users }}</p>
+  </article>
+  <article class="card">
+    <h2>Licenses Assigned</h2>
+    <p class="metric">{{ assigned_licenses }}</p>
+  </article>
+</section>
+
+<section>
+  <h2>Recent Activity</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Action</th>
+        <th>Target</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in recent %}
+      <tr>
+        <td>{{ row.timestamp }}</td>
+        <td>{{ row.action }}</td>
+        <td>{{ row.target_email }}</td>
+        <td>{{ row.details }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

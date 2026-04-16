@@ -17,6 +17,7 @@ import {
   getTodosForTask,
   saveTodosForTask,
   clearTodosForTask,
+  sanitizeLegacyMockAdminPromptsInHistory,
 } from '../storage/repositories/taskHistory.js';
 import {
   getDebugMode,
@@ -267,6 +268,12 @@ export function createStorage(options: StorageOptions = {}): StorageAPI {
       }
       const dbPath = databasePath || `${storagePath}/agent-core.db`;
       initializeDatabase({ databasePath: dbPath, runMigrations });
+      const sanitizedCount = sanitizeLegacyMockAdminPromptsInHistory();
+      if (sanitizedCount > 0) {
+        console.log(
+          `[Storage] Sanitized ${sanitizedCount} legacy mock-admin prompt entr${sanitizedCount === 1 ? 'y' : 'ies'}`,
+        );
+      }
       migrateConnectorClientSecretsToSecureStorage();
       initialized = true;
     },

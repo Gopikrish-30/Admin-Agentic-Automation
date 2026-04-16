@@ -1,0 +1,8 @@
+flask==3.1.0
+playwright==1.44.0
+openai==1.76.2
+python-dotenv==1.0.1
+rich==13.7.1
+pillow==10.4.0
+werkzeug==3.0.3
+pytest==8.3.5

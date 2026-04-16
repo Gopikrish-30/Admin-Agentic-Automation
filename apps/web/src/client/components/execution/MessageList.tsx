@@ -12,6 +12,7 @@ import { StreamingText } from '../ui/streaming-text';
 import { BrowserScriptCard } from '../BrowserScriptCard';
 import { getToolDisplayInfo } from '../../constants/tool-mappings';
 import { SpinningIcon } from './SpinningIcon';
+import { sanitizePromptForDisplay } from '../../lib/prompt-sanitizer';
 
 export interface MessageBubbleProps {
   message: TaskMessage;
@@ -65,6 +66,7 @@ export const MessageBubble = memo(
     const toolName = message.toolName || message.content?.match(/Using tool: (\w+)/)?.[1];
     const toolDisplayInfo = toolName ? getToolDisplayInfo(toolName) : undefined;
     const ToolIcon = toolDisplayInfo?.icon;
+    const displayContent = isUser ? sanitizePromptForDisplay(message.content) : message.content;
 
     useEffect(() => {
       if (!shouldStream) {
@@ -83,7 +85,7 @@ export const MessageBubble = memo(
 
     const handleCopy = useCallback(async () => {
       try {
-        await navigator.clipboard.writeText(message.content);
+        await navigator.clipboard.writeText(displayContent);
         setCopied(true);
 
         if (timeoutRef.current) {
@@ -96,7 +98,7 @@ export const MessageBubble = memo(
       } catch {
         // clipboard write may fail in non-secure contexts
       }
-    }, [message.content]);
+    }, [displayContent]);
 
     if (isTool && message.toolName === 'todowrite') {
       return null;
@@ -106,7 +108,7 @@ export const MessageBubble = memo(
       return null;
     }
 
-    const showCopyButton = !isTool && !!message.content?.trim();
+    const showCopyButton = !isTool && !!displayContent?.trim();
 
     return (
       <motion.div
@@ -169,7 +171,7 @@ export const MessageBubble = memo(
                       'text-primary-foreground',
                     )}
                   >
-                    {message.content}
+                    {displayContent}
                   </p>
                 ) : isAssistant && shouldStream && !streamComplete ? (
                   <StreamingText

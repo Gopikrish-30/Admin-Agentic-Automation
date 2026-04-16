@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron';
 import type { TaskMessage, TaskResult, TaskStatus, TodoItem } from '@navigator_ai/agent-core';
-import { mapResultToStatus } from '@navigator_ai/agent-core';
+import { createMessageId, mapResultToStatus } from '@navigator_ai/agent-core';
 import { getTaskManager, recoverDevBrowserServer } from '../opencode';
 import type { TaskCallbacks } from '../opencode';
 import { getStorage } from '../store/storage';
@@ -152,11 +152,21 @@ export function createTaskCallbacks(options: TaskCallbacksOptions): TaskCallback
     },
 
     onError: (error: Error) => {
+      const errorMessage = error?.message?.trim() || 'Task failed before execution started.';
+
       forwardToRenderer('task:update', {
         taskId,
         type: 'error',
-        error: error.message,
+        error: errorMessage,
       });
+
+      const errorTaskMessage: TaskMessage = {
+        id: createMessageId(),
+        type: 'assistant',
+        content: `Task failed: ${errorMessage}`,
+        timestamp: new Date().toISOString(),
+      };
+      storage.addTaskMessage(taskId, errorTaskMessage);
 
       storage.updateTaskStatus(taskId, 'failed', new Date().toISOString());
     },
@@ -205,6 +215,13 @@ export function createTaskCallbacks(options: TaskCallbacksOptions): TaskCallback
           type: 'error',
           error: reason,
         });
+        const violationMessage: TaskMessage = {
+          id: createMessageId(),
+          type: 'assistant',
+          content: `Task failed: ${reason}`,
+          timestamp: new Date().toISOString(),
+        };
+        storage.addTaskMessage(taskId, violationMessage);
         storage.updateTaskStatus(taskId, 'failed', new Date().toISOString());
 
         void taskManager.cancelTask(taskId).catch((error) => {
