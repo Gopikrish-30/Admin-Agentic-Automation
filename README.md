@@ -1,34 +1,26 @@
-# Admin Runtime
+# Admin Agentic Automation
 
-This repository is a streamlined admin automation workspace focused on local task execution, mock-admin flows, and a clean white/grey web UI.
+Admin Agentic Automation is a monorepo for running AI-driven admin workflows through a desktop runtime and a web interface. It combines a local task runner, provider integrations, and a mock admin target environment so you can build and test automation flows end to end.
 
-## What Is Included
+## What This Project Includes
 
-- Web client (`apps/web`) with a neutral white/grey interface.
-- Desktop runtime (`apps/desktop`) for Electron-based local execution.
-- Mock admin server (`apps/mock-admin`) for demo and testing workflows.
-- Shared orchestration core (`packages/agent-core`) for task execution and MCP-style tools.
+- A React + Vite web client for task input, execution view, and settings.
+- An Electron desktop runtime that hosts and coordinates local automation services.
+- A mock admin backend for development and automated scenario testing.
+- A shared core package for agent execution, storage, provider handling, and tool integrations.
 
-## Recent Product Updates
+## Workspace Structure
 
-- Reworked UI theme to a professional white/grey visual system.
-- Increased visual separation in the chat panel and page surfaces.
-- Removed image and PDF attachment options from prompt/follow-up input.
-- Updated home hero copy for admin-panel-oriented workflows.
-- Reduced unused test and skill surface area for a leaner demo runtime.
+- apps/web: Frontend client (React, TypeScript, Vite).
+- apps/desktop: Electron application and IPC/runtime layer.
+- apps/mock-admin: Mock admin server used as a controlled automation target.
+- packages/agent-core: Shared runtime logic, connectors, and MCP-style tools.
+- scripts: Workspace-level development and maintenance scripts.
 
-## Monorepo Structure
+## Requirements
 
-- `apps/web`: React + Vite frontend.
-- `apps/desktop`: Electron app shell and IPC runtime.
-- `apps/mock-admin`: Local mock admin backend.
-- `packages/agent-core`: Shared runtime logic and tool integrations.
-- `scripts`: Workspace-level development scripts.
-
-## Prerequisites
-
-- Node.js 20+
-- pnpm 9+
+- Node.js 20 or newer
+- pnpm 9 or newer
 
 ## Install
 
@@ -36,49 +28,55 @@ This repository is a streamlined admin automation workspace focused on local tas
 pnpm install
 ```
 
-## Development
+## Run Locally
 
-Run the full workspace flow:
+Start the full development workflow:
 
 ```bash
 pnpm dev
 ```
 
-Run web app only:
+Start only the web client:
 
 ```bash
 pnpm dev:web
 ```
 
-Run mock-admin backend only:
+Start only the mock admin service:
 
 ```bash
 pnpm dev:mock-admin
 ```
 
-## Validation
+## Build And Validate
 
-Typecheck all packages:
+Type-check all workspace packages:
 
 ```bash
 pnpm typecheck
 ```
 
-Build web app:
+Build all workspace packages:
+
+```bash
+pnpm build
+```
+
+Build web only:
 
 ```bash
 pnpm build:web
 ```
 
-Build desktop app:
+Build desktop only:
 
 ```bash
 pnpm build:desktop
 ```
 
-## Deployment Note
+## Deployment Model
 
-The web client can be hosted on standard web platforms, but full task execution currently depends on desktop/runtime APIs. For cloud deployment, split runtime responsibilities into a long-running backend service and connect the web app over HTTP/WebSocket.
+The web client can be deployed independently, but full agent execution currently depends on the runtime layer used by the desktop app. For cloud deployment, split the runtime into a dedicated backend service and connect the web app to it via HTTP/WebSocket APIs.
 
 ## License
 
